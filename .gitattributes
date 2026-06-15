@@ -1,0 +1,5 @@
+# Garante LF nos arquivos que rodam no container Linux (evita ^M / bad interpreter)
+*.sh   text eol=lf
+*.py   text eol=lf
+Dockerfile text eol=lf
+requirements.txt text eol=lf
