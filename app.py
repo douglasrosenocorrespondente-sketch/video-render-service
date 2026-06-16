@@ -36,13 +36,14 @@ from flask import Flask, request, send_file, jsonify, abort
 app = Flask(__name__)
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-VERSION = "4-leve"
+VERSION = "5-foto-leve"
 TOKEN = os.environ.get("RENDER_TOKEN", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
 DOWNLOAD_TIMEOUT = int(os.environ.get("DOWNLOAD_TIMEOUT", "60"))
-# usar b-roll em video do Pexels (cai p/ foto quando nao acha video)
-PREFER_VIDEO = os.environ.get("PREFER_VIDEO", "1") not in ("0", "false", "")
+# b-roll em video do Pexels. PADRAO DESLIGADO: pesado demais p/ VPS de 1 nucleo.
+# Ligue (PREFER_VIDEO=1) so se subir o VPS p/ 2+ vCPU.
+PREFER_VIDEO = os.environ.get("PREFER_VIDEO", "0") not in ("0", "false", "")
 
 
 def _check_auth():

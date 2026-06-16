@@ -57,10 +57,17 @@ for M in "${MEDIA[@]}"; do
         -r ${FPS} -c:v libx264 -preset ultrafast -pix_fmt yuv420p "$CLIP"
       ;;
     *)
-      # imagem: zoom suave (Ken Burns)
-      ffmpeg -y -threads ${FF_THREADS} -loop 1 -i "$M" -t "$PERIMG" \
-        -vf "scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},zoompan=z='min(zoom+0.0012,1.15)':d=${FRAMES}:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p" \
-        -r ${FPS} -c:v libx264 -preset ultrafast -pix_fmt yuv420p -an "$CLIP"
+      if [ "${KENBURNS:-0}" = "1" ]; then
+        # imagem com zoom suave (Ken Burns) — pesado de CPU, so com VPS folgado
+        ffmpeg -y -threads ${FF_THREADS} -loop 1 -i "$M" -t "$PERIMG" \
+          -vf "scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},zoompan=z='min(zoom+0.0012,1.15)':d=${FRAMES}:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p" \
+          -r ${FPS} -c:v libx264 -preset ultrafast -pix_fmt yuv420p -an "$CLIP"
+      else
+        # imagem estatica (leve): so escala/recorta, sem zoom
+        ffmpeg -y -threads ${FF_THREADS} -loop 1 -i "$M" -t "$PERIMG" \
+          -vf "scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${FPS},format=yuv420p" \
+          -r ${FPS} -c:v libx264 -preset ultrafast -pix_fmt yuv420p -an "$CLIP"
+      fi
       ;;
   esac
   echo "file '$CLIP'" >> "$DIR/list.txt"
