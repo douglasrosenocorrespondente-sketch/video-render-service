@@ -79,19 +79,34 @@ done
 # --- 2) concatena os clipes (copia direta: clipes ja tem mesmo codec/params) ---
 ffmpeg -y -f concat -safe 0 -i "$DIR/list.txt" -c copy "$DIR/mudo.mp4"
 
-# --- 3) audio + (opcional) legendas queimadas ---
+# --- 3) audio (narracao + musica de fundo opcional) + legendas queimadas ---
+# MarginV/Fontsize no espaco ASS padrao (288px), escalados p/ a altura do video.
+STYLE="FontName=${FONT_NAME},Fontsize=18,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=70"
 if [ -f "$SRT" ]; then
-  # Fontsize/MarginV/Outline sao interpretados no espaco ASS padrao (288px de altura)
-  # e escalados ~6.6x p/ 1920. MarginV=70 -> ~terco inferior; Fontsize=18 -> ~120px.
-  STYLE="FontName=${FONT_NAME},Fontsize=18,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=70"
-  ffmpeg -y -threads ${FF_THREADS} -i "$DIR/mudo.mp4" -i "$AUDIO" \
-    -vf "subtitles=${SRT}:fontsdir=${FONTS_DIR}:force_style='${STYLE}'" \
-    -map 0:v -map 1:a -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
-    -c:a aac -b:a 192k -shortest "$OUT"
+  VFILTER="subtitles=${SRT}:fontsdir=${FONTS_DIR}:force_style='${STYLE}'"
 else
   echo "AVISO: $SRT nao encontrado — gerando sem legendas." >&2
+  VFILTER="null"
+fi
+
+# trilha de fundo: 1o arquivo em MUSIC_DIR (se houver). Coloque mp3 sem copyright la.
+MUSIC_DIR="${MUSIC_DIR:-/app/music}"
+MUSIC_VOLUME="${MUSIC_VOLUME:-0.12}"
+MUSICS=("$MUSIC_DIR"/*.mp3 "$MUSIC_DIR"/*.m4a "$MUSIC_DIR"/*.wav)
+
+if [ ${#MUSICS[@]} -gt 0 ]; then
+  MUSIC="${MUSICS[RANDOM % ${#MUSICS[@]}]}"
+  echo "Musica de fundo: $MUSIC (vol=$MUSIC_VOLUME)"
+  # narracao em volume cheio + musica em loop e volume baixo (normalize=0 nao abaixa a narracao)
+  ffmpeg -y -threads ${FF_THREADS} -i "$DIR/mudo.mp4" -i "$AUDIO" -stream_loop -1 -i "$MUSIC" \
+    -filter_complex "[0:v]${VFILTER}[v];[2:a]volume=${MUSIC_VOLUME}[bg];[1:a][bg]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]" \
+    -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
+    -c:a aac -b:a 192k -shortest "$OUT"
+else
+  echo "Sem musica de fundo (nenhum arquivo em $MUSIC_DIR)."
   ffmpeg -y -threads ${FF_THREADS} -i "$DIR/mudo.mp4" -i "$AUDIO" \
-    -map 0:v -map 1:a -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
+    -filter_complex "[0:v]${VFILTER}[v]" \
+    -map "[v]" -map 1:a -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
     -c:a aac -b:a 192k -shortest "$OUT"
 fi
 

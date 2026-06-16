@@ -15,6 +15,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py montar.sh thumb.sh selftest.sh ./
+COPY music/ /app/music/
 RUN chmod +x montar.sh thumb.sh selftest.sh
 
 # Fonte Anton (condensada, estilo esportivo) baixada do Google Fonts no build
@@ -26,7 +27,9 @@ RUN curl -fsSL --create-dirs \
 ENV PORT=8088 \
     FONTS_DIR=/usr/share/fonts \
     FONT_NAME=Anton \
-    FONT_FILE=/usr/share/fonts/truetype/anton/Anton-Regular.ttf
+    FONT_FILE=/usr/share/fonts/truetype/anton/Anton-Regular.ttf \
+    MUSIC_DIR=/app/music \
+    MUSIC_VOLUME=0.12
 
 EXPOSE 8088
 
