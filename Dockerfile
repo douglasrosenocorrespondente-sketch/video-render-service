@@ -17,16 +17,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py montar.sh thumb.sh selftest.sh ./
 RUN chmod +x montar.sh thumb.sh selftest.sh
 
-# Para usar a fonte Anton nas legendas/thumb:
-#   1) copie Anton.ttf para a imagem (descomente a linha abaixo e adicione o arquivo)
-#   2) defina FONT_NAME=Anton e FONT_FILE=/usr/share/fonts/truetype/anton/Anton.ttf
-# COPY Anton.ttf /usr/share/fonts/truetype/anton/Anton.ttf
-# RUN fc-cache -f
+# Fonte Anton (condensada, estilo esportivo) baixada do Google Fonts no build
+RUN curl -fsSL --create-dirs \
+        -o /usr/share/fonts/truetype/anton/Anton-Regular.ttf \
+        https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf \
+    && fc-cache -f
 
 ENV PORT=8088 \
     FONTS_DIR=/usr/share/fonts \
-    FONT_NAME="DejaVu Sans" \
-    FONT_FILE=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+    FONT_NAME=Anton \
+    FONT_FILE=/usr/share/fonts/truetype/anton/Anton-Regular.ttf
 
 EXPOSE 8088
 

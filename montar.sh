@@ -16,7 +16,7 @@ OUT="$DIR/final.mp4"
 # Fonte das legendas. Por padrao usa DejaVu (vem na imagem). Para usar Anton,
 # coloque Anton.ttf em FONTS_DIR e defina FONT_NAME=Anton.
 FONTS_DIR="${FONTS_DIR:-/usr/share/fonts}"
-FONT_NAME="${FONT_NAME:-DejaVu Sans}"
+FONT_NAME="${FONT_NAME:-Anton}"
 
 W=1080; H=1920; FPS=25
 
@@ -57,7 +57,9 @@ ffmpeg -y -f concat -safe 0 -i "$DIR/list.txt" \
 
 # --- 3) audio + (opcional) legendas queimadas ---
 if [ -f "$SRT" ]; then
-  STYLE="FontName=${FONT_NAME},Fontsize=15,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=3,Outline=2,Alignment=2,MarginV=140"
+  # Fontsize/MarginV/Outline sao interpretados no espaco ASS padrao (288px de altura)
+  # e escalados ~6.6x p/ 1920. MarginV=70 -> ~terco inferior; Fontsize=18 -> ~120px.
+  STYLE="FontName=${FONT_NAME},Fontsize=18,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=70"
   ffmpeg -y -i "$DIR/mudo.mp4" -i "$AUDIO" \
     -vf "subtitles=${SRT}:fontsdir=${FONTS_DIR}:force_style='${STYLE}'" \
     -map 0:v -map 1:a -c:v libx264 -preset veryfast -pix_fmt yuv420p \

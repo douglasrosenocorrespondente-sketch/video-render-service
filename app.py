@@ -86,7 +86,9 @@ def _pexels_search(term):
         r.raise_for_status()
         photos = r.json().get("photos", [])
         if photos:
-            return photos[0]["src"]["large"]
+            src = photos[0]["src"]
+            # large2x tem mais resolucao (menos amador) com fallback p/ large/original
+            return src.get("large2x") or src.get("original") or src.get("large")
     except Exception as e:  # noqa: BLE001
         app.logger.warning("pexels falhou p/ '%s': %s", term, e)
     return None
