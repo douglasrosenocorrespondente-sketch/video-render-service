@@ -36,7 +36,8 @@ from flask import Flask, request, send_file, jsonify, abort
 app = Flask(__name__)
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-VERSION = "7-musica-esporte"
+VERSION = "8-musica-debug"
+MUSIC_DIR = os.environ.get("MUSIC_DIR", "/app/music")
 TOKEN = os.environ.get("RENDER_TOKEN", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
@@ -209,9 +210,14 @@ def _form_json(field):
 @app.get("/health")
 def health():
     import shutil
+    music = (glob.glob(os.path.join(MUSIC_DIR, "*.mp3"))
+             + glob.glob(os.path.join(MUSIC_DIR, "*.m4a"))
+             + glob.glob(os.path.join(MUSIC_DIR, "*.wav")))
     return jsonify(ok=True,
                    version=VERSION,
                    prefer_video=PREFER_VIDEO,
+                   music_files=len(music),
+                   music_names=[os.path.basename(m) for m in music],
                    ffmpeg=shutil.which("ffmpeg") is not None,
                    openai=bool(OPENAI_API_KEY),
                    pexels=bool(PEXELS_API_KEY))
