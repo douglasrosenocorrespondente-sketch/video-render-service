@@ -36,7 +36,7 @@ from flask import Flask, request, send_file, jsonify, abort
 app = Flask(__name__)
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-VERSION = "3-broll"
+VERSION = "4-leve"
 TOKEN = os.environ.get("RENDER_TOKEN", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
@@ -105,7 +105,7 @@ def _pexels_video_search(term):
         r = requests.get(
             "https://api.pexels.com/videos/search",
             params={"query": term, "per_page": 1, "orientation": "portrait",
-                    "size": "medium"},
+                    "size": "small"},
             headers={"Authorization": PEXELS_API_KEY},
             timeout=DOWNLOAD_TIMEOUT,
         )
@@ -120,8 +120,8 @@ def _pexels_video_search(term):
         if not cand:
             return None
         cand.sort(key=lambda f: f.get("height") or 0)
-        # menor arquivo com altura >= 1080 (qualidade boa sem baixar gigante); senão o maior
-        chosen = next((f for f in cand if (f.get("height") or 0) >= 1080), cand[-1])
+        # menor arquivo com altura >= 720: leve p/ baixar/decodificar (vira fundo, escala p/ 1080)
+        chosen = next((f for f in cand if (f.get("height") or 0) >= 720), cand[-1])
         return chosen.get("link")
     except Exception as e:  # noqa: BLE001
         app.logger.warning("pexels video falhou p/ '%s': %s", term, e)
