@@ -26,11 +26,14 @@ W=1080; H=1920; FPS=25
 DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$AUDIO" || true)
 [ -n "${DUR:-}" ] || { echo "ERRO: ffprobe nao retornou duracao" >&2; exit 1; }
 
-# --- imagens (ordenadas) ---
+# --- midia (b-roll de video e/ou imagens), ordenada ---
 shopt -s nullglob
-mapfile -t IMAGES < <(ls -1 "$DIR"/img_*.jpg "$DIR"/img_*.jpeg "$DIR"/img_*.png 2>/dev/null | sort)
-N=${#IMAGES[@]}
-[ "$N" -gt 0 ] || { echo "ERRO: nenhuma imagem img_* em $DIR" >&2; exit 1; }
+mapfile -t MEDIA < <(ls -1 "$DIR"/media_* 2>/dev/null | sort)
+if [ ${#MEDIA[@]} -eq 0 ]; then
+  mapfile -t MEDIA < <(ls -1 "$DIR"/img_*.jpg "$DIR"/img_*.jpeg "$DIR"/img_*.png 2>/dev/null | sort)
+fi
+N=${#MEDIA[@]}
+[ "$N" -gt 0 ] || { echo "ERRO: nenhuma midia (media_*/img_*) em $DIR" >&2; exit 1; }
 
 # --- tempo por imagem e frames (awk no lugar de bc) ---
 PERIMG=$(awk -v d="$DUR" -v n="$N" 'BEGIN{printf "%.3f", d/n}')
@@ -39,14 +42,25 @@ FRAMES=$(awk -v p="$PERIMG" -v f="$FPS" 'BEGIN{printf "%d", (p*f)+0.5}')
 
 echo "DUR=$DUR  N=$N  PERIMG=$PERIMG  FRAMES=$FRAMES"
 
-# --- 1) um clipe por imagem, com zoom suave (Ken Burns) ---
+# --- 1) um clipe por midia: video recortado em 9:16 OU imagem com Ken Burns ---
 : > "$DIR/list.txt"
 i=0
-for IMG in "${IMAGES[@]}"; do
+for M in "${MEDIA[@]}"; do
   CLIP="$DIR/clip_$(printf '%03d' "$i").mp4"
-  ffmpeg -y -loop 1 -i "$IMG" -t "$PERIMG" \
-    -vf "scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},zoompan=z='min(zoom+0.0012,1.15)':d=${FRAMES}:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p" \
-    -r ${FPS} -c:v libx264 -preset veryfast -pix_fmt yuv420p -an "$CLIP"
+  case "${M,,}" in
+    *.mp4|*.mov|*.webm|*.mkv|*.m4v)
+      # b-roll: loopa p/ preencher PERIMG, recorta 9:16, sem audio
+      ffmpeg -y -stream_loop -1 -i "$M" -t "$PERIMG" -an \
+        -vf "scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${FPS},format=yuv420p" \
+        -r ${FPS} -c:v libx264 -preset veryfast -pix_fmt yuv420p "$CLIP"
+      ;;
+    *)
+      # imagem: zoom suave (Ken Burns)
+      ffmpeg -y -loop 1 -i "$M" -t "$PERIMG" \
+        -vf "scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},zoompan=z='min(zoom+0.0012,1.15)':d=${FRAMES}:s=${W}x${H}:fps=${FPS},setsar=1,format=yuv420p" \
+        -r ${FPS} -c:v libx264 -preset veryfast -pix_fmt yuv420p -an "$CLIP"
+      ;;
+  esac
   echo "file '$CLIP'" >> "$DIR/list.txt"
   i=$((i+1))
 done

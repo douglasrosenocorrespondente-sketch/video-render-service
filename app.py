@@ -36,10 +36,13 @@ from flask import Flask, request, send_file, jsonify, abort
 app = Flask(__name__)
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+VERSION = "3-broll"
 TOKEN = os.environ.get("RENDER_TOKEN", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
-DOWNLOAD_TIMEOUT = int(os.environ.get("DOWNLOAD_TIMEOUT", "30"))
+DOWNLOAD_TIMEOUT = int(os.environ.get("DOWNLOAD_TIMEOUT", "60"))
+# usar b-roll em video do Pexels (cai p/ foto quando nao acha video)
+PREFER_VIDEO = os.environ.get("PREFER_VIDEO", "1") not in ("0", "false", "")
 
 
 def _check_auth():
@@ -94,6 +97,37 @@ def _pexels_search(term):
     return None
 
 
+def _pexels_video_search(term):
+    """Retorna o link de um vídeo vertical do Pexels para o termo, ou None."""
+    if not PEXELS_API_KEY:
+        return None
+    try:
+        r = requests.get(
+            "https://api.pexels.com/videos/search",
+            params={"query": term, "per_page": 1, "orientation": "portrait",
+                    "size": "medium"},
+            headers={"Authorization": PEXELS_API_KEY},
+            timeout=DOWNLOAD_TIMEOUT,
+        )
+        r.raise_for_status()
+        vids = r.json().get("videos", [])
+        if not vids:
+            return None
+        files = vids[0].get("video_files", [])
+        # prefere arquivos verticais (altura >= largura)
+        portrait = [f for f in files if (f.get("height") or 0) >= (f.get("width") or 0)]
+        cand = portrait or files
+        if not cand:
+            return None
+        cand.sort(key=lambda f: f.get("height") or 0)
+        # menor arquivo com altura >= 1080 (qualidade boa sem baixar gigante); senão o maior
+        chosen = next((f for f in cand if (f.get("height") or 0) >= 1080), cand[-1])
+        return chosen.get("link")
+    except Exception as e:  # noqa: BLE001
+        app.logger.warning("pexels video falhou p/ '%s': %s", term, e)
+        return None
+
+
 def _download(url, path):
     r = requests.get(url, timeout=DOWNLOAD_TIMEOUT,
                      headers={"User-Agent": "Mozilla/5.0 (render-service)"})
@@ -102,28 +136,41 @@ def _download(url, path):
         f.write(r.content)
 
 
-def _resolve_images(workdir, image_urls, pexels_terms):
-    """Resolve imagens a partir de URLs diretas e/ou termos do Pexels."""
-    urls = list(image_urls or [])
+def _resolve_media(workdir, image_urls, pexels_terms):
+    """Resolve cada termo em b-roll de vídeo (preferido) ou foto do Pexels,
+    salvando como media_NNN.mp4 / media_NNN.jpg na ordem. URLs diretas viram fotos."""
+    idx = len(glob.glob(os.path.join(workdir, "media_*")))
     for term in (pexels_terms or []):
-        u = _pexels_search(term)
-        if u:
-            urls.append(u)
-    saved = 0
-    for idx, u in enumerate(urls):
+        if PREFER_VIDEO:
+            vurl = _pexels_video_search(term)
+            if vurl:
+                try:
+                    _download(vurl, os.path.join(workdir, f"media_{idx:03d}.mp4"))
+                    idx += 1
+                    continue
+                except Exception as e:  # noqa: BLE001
+                    app.logger.warning("falha ao baixar video %s: %s", vurl, e)
+        purl = _pexels_search(term)
+        if purl:
+            try:
+                _download(purl, os.path.join(workdir, f"media_{idx:03d}.jpg"))
+                idx += 1
+            except Exception as e:  # noqa: BLE001
+                app.logger.warning("falha ao baixar foto %s: %s", purl, e)
+    for u in (image_urls or []):
         try:
-            _download(u, os.path.join(workdir, f"img_{idx:03d}.jpg"))
-            saved += 1
+            _download(u, os.path.join(workdir, f"media_{idx:03d}.jpg"))
+            idx += 1
         except Exception as e:  # noqa: BLE001
             app.logger.warning("falha ao baixar %s: %s", u, e)
-    return saved
+    return idx
 
 
 def _ensure_one_image(workdir):
-    if not glob.glob(os.path.join(workdir, "img_*")):
+    if not glob.glob(os.path.join(workdir, "media_*")) and not glob.glob(os.path.join(workdir, "img_*")):
         subprocess.run(["ffmpeg", "-y", "-f", "lavfi",
                         "-i", "color=c=0x111827:s=1080x1920:d=1",
-                        "-frames:v", "1", os.path.join(workdir, "img_000.jpg")],
+                        "-frames:v", "1", os.path.join(workdir, "media_000.jpg")],
                        capture_output=True)
 
 
@@ -162,6 +209,8 @@ def _form_json(field):
 def health():
     import shutil
     return jsonify(ok=True,
+                   version=VERSION,
+                   prefer_video=PREFER_VIDEO,
                    ffmpeg=shutil.which("ffmpeg") is not None,
                    openai=bool(OPENAI_API_KEY),
                    pexels=bool(PEXELS_API_KEY))
@@ -198,8 +247,8 @@ def render():
     audio_path = os.path.join(workdir, "narration.mp3")
     request.files["audio"].save(audio_path)
 
-    # imagens
-    _resolve_images(workdir, _form_json("image_urls"), _form_json("pexels_terms"))
+    # mídia (b-roll de vídeo preferido, cai p/ foto)
+    _resolve_media(workdir, _form_json("image_urls"), _form_json("pexels_terms"))
     _ensure_one_image(workdir)
 
     # legendas: srt explícito tem prioridade; senão transcreve se pedido
