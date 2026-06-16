@@ -18,9 +18,11 @@ OUT="$DIR/final.mp4"
 FONTS_DIR="${FONTS_DIR:-/usr/share/fonts}"
 FONT_NAME="${FONT_NAME:-Anton}"
 
-W=1080; H=1920; FPS=25
-# limita threads do ffmpeg p/ nao tomar toda a CPU do VPS (e derrubar o n8n)
-FF_THREADS="${FF_THREADS:-2}"
+# Resolucao padrao 720x1280 (9:16): ~2x mais rapido que 1080x1920 em VPS fraco.
+# Suba p/ 1080x1920 (VID_W/VID_H) so com VPS de 2+ vCPU.
+W="${VID_W:-720}"; H="${VID_H:-1280}"; FPS=25
+# 1 thread: o container ja esta limitado a 0.5 CPU no easypanel
+FF_THREADS="${FF_THREADS:-1}"
 
 [ -f "$AUDIO" ] || { echo "ERRO: $AUDIO nao encontrado" >&2; exit 1; }
 
@@ -84,12 +86,12 @@ if [ -f "$SRT" ]; then
   STYLE="FontName=${FONT_NAME},Fontsize=18,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=70"
   ffmpeg -y -threads ${FF_THREADS} -i "$DIR/mudo.mp4" -i "$AUDIO" \
     -vf "subtitles=${SRT}:fontsdir=${FONTS_DIR}:force_style='${STYLE}'" \
-    -map 0:v -map 1:a -c:v libx264 -preset veryfast -pix_fmt yuv420p \
+    -map 0:v -map 1:a -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
     -c:a aac -b:a 192k -shortest "$OUT"
 else
   echo "AVISO: $SRT nao encontrado — gerando sem legendas." >&2
   ffmpeg -y -threads ${FF_THREADS} -i "$DIR/mudo.mp4" -i "$AUDIO" \
-    -map 0:v -map 1:a -c:v libx264 -preset veryfast -pix_fmt yuv420p \
+    -map 0:v -map 1:a -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
     -c:a aac -b:a 192k -shortest "$OUT"
 fi
 
