@@ -29,7 +29,7 @@ ENV PORT=8088 \
     FONT_NAME=Anton \
     FONT_FILE=/usr/share/fonts/truetype/anton/Anton-Regular.ttf \
     MUSIC_DIR=/app/music \
-    MUSIC_VOLUME=0.12
+    MUSIC_VOLUME=0.16
 
 EXPOSE 8088
 
