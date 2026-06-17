@@ -36,7 +36,7 @@ from flask import Flask, request, send_file, jsonify, abort
 app = Flask(__name__)
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-VERSION = "8-musica-debug"
+VERSION = "9-foto-fundo-borrado"
 MUSIC_DIR = os.environ.get("MUSIC_DIR", "/app/music")
 TOKEN = os.environ.get("RENDER_TOKEN", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
